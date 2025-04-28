@@ -1,0 +1,23 @@
+{
+  "tasks": {
+    "dev": "deno run -A  --unstable-kv service/main.ts",
+    "webhook": "deno run -A service/helpers/setWebhook.ts",
+    "start": "dxd vault run \"deno task dev\""
+  },
+  "imports": {
+    "$bot": "./service/bot/mod.ts",
+    "$db": "./service/db/mod.ts",
+    "$shared": "./service/shared.ts",
+    "$constants": "./service/constants.ts",
+    "$types": "./service/types.ts",
+    "$strings": "./service/strings.ts",
+    "$config": "./config/base.tuner.ts",
+    "@hono/hono": "jsr:@hono/hono@^4.7.7",
+    "@hono/": "https://deno.land/x/hono@v4.3.11/",
+    "@grammy": "https://deno.land/x/grammy/mod.ts",
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@^2.49.1",
+    "@artpani/tuner": "https://deno.land/x/tuner@v0.6.7/mod.ts?source",
+    "@vseplet/luminous": "jsr:@vseplet/luminous@1.0.6",
+    "openai": "jsr:@openai/openai"
+  }
+}

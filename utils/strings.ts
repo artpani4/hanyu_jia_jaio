@@ -32,7 +32,11 @@ const DEFAULT_STRINGS: Record<StringKey, string> = {
   LANG_PICK: "🌍 Choose language",
   LANG_SELECTED: "✅ Interface language changed",
   ADD_WORDS_INSTRUCTION:
-    "📚 Now add words to study. Send text in format:\nword|pinyin|character|translation\n\nExample:\nhello|nǐ hǎo|你好|hello",
+    "📚 Now add words to study. You can use these formats:\n\n" +
+    "• character\n" +
+    "• character | translation\n" +
+    "• character | pinyin | translation\n\n" +
+    "Example:\n你好 | nǐ hǎo | hello",
   GET_TASK_BUTTON: "📝 Get new task",
   ADD_WORDS_BUTTON: "📌 Add words",
   RESET_WORDS_BUTTON: "🔄 Reset words",
@@ -40,10 +44,18 @@ const DEFAULT_STRINGS: Record<StringKey, string> = {
   NO_WORDS_ERROR: "⚠️ You don't have any words added yet. Add words to study!",
   TASK_PROMPT: "✨ Practice with these sentences:",
   WORDS_ADDED: "✅ Words successfully added!",
-  WORDS_IMPORT_ERROR: "❌ Error importing words. Check format and try again.",
+  WORDS_IMPORT_ERROR:
+    "❌ Error importing words. Please use one of these formats:\n\n" +
+    "• character\n" +
+    "• character | translation\n" +
+    "• character | pinyin | translation",
   TASK_GENERATION_ERROR: "❌ Error generating task. Please try later.",
   HELP_MESSAGE:
-    "ℹ️ Bot commands:\n/start - Start\n/language - Change language\n/help - Show help\n/stats - Show word statistics\n/reset - Reset all your words\n\nWord addition format:\nword|pinyin|character|translation",
+    "ℹ️ Bot commands:\n/start - Start\n/language - Change language\n/help - Show help\n/stats - Show word statistics\n/reset - Reset all your words\n\n" +
+    "Word input formats:\n" +
+    "• character\n" +
+    "• character | translation\n" +
+    "• character | pinyin | translation",
   STATS_MESSAGE:
     "📊 Your word statistics:\n\nTotal words: {total}\nUsed in tasks: {used}\nNot yet used: {unused}\n\nYour most used words:\n{top_words}",
   STATS_NO_WORDS: "⚠️ You don't have any words added yet to show statistics.",
@@ -67,7 +79,11 @@ const STRINGS: Record<SupportedLanguage, Record<StringKey, string>> = {
     LANG_PICK: "🌍 Выберите язык",
     LANG_SELECTED: "✅ Язык интерфейса изменен",
     ADD_WORDS_INSTRUCTION:
-      "📚 Теперь добавьте слова для изучения. Отправьте текст в формате:\nслово|пиньинь|иероглиф|перевод\n\nПример:\nhello|nǐ hǎo|你好|привет",
+      "📚 Теперь добавьте слова для изучения. Допустимые форматы:\n\n" +
+      "• иероглиф\n" +
+      "• иероглиф | перевод\n" +
+      "• иероглиф | пиньинь | перевод\n\n" +
+      "Пример:\n你好 | nǐ hǎo | привет",
     GET_TASK_BUTTON: "📝 Получить новое задание",
     ADD_WORDS_BUTTON: "📌 Добавить слова",
     RESET_WORDS_BUTTON: "🔄 Сбросить слова",
@@ -76,11 +92,17 @@ const STRINGS: Record<SupportedLanguage, Record<StringKey, string>> = {
       "⚠️ У вас пока нет добавленных слов. Добавьте слова для изучения!",
     TASK_PROMPT: "✨ Потренируйтесь с этими предложениями:",
     WORDS_ADDED: "✅ Слова успешно добавлены!",
-    WORDS_IMPORT_ERROR:
-      "❌ Ошибка при импорте слов. Проверьте формат и попробуйте еще раз.",
+    WORDS_IMPORT_ERROR: "❌ Ошибка при импорте слов. Допустимые форматы:\n\n" +
+      "• иероглиф\n" +
+      "• иероглиф | перевод\n" +
+      "• иероглиф | пиньинь | перевод",
     TASK_GENERATION_ERROR: "❌ Ошибка при генерации задания. Попробуйте позже.",
     HELP_MESSAGE:
-      "ℹ️ Команды бота:\n/start - Начать работу\n/language - Сменить язык\n/help - Показать помощь\n/stats - Показать статистику слов\n/reset - Сбросить все ваши слова\n\nФормат добавления слов:\nслово|пиньинь|иероглиф|перевод",
+      "ℹ️ Команды бота:\n/start - Начать работу\n/language - Сменить язык\n/help - Показать помощь\n/stats - Показать статистику слов\n/reset - Сбросить все ваши слова\n\n" +
+      "Форматы ввода слов:\n" +
+      "• иероглиф\n" +
+      "• иероглиф | перевод\n" +
+      "• иероглиф | пиньинь | перевод",
     STATS_MESSAGE:
       "📊 Статистика ваших слов:\n\nВсего слов: {total}\nИспользовано в заданиях: {used}\nЕще не использовано: {unused}\n\nСлова, которые вы использовали больше всего:\n{top_words}",
     STATS_NO_WORDS:
@@ -95,8 +117,6 @@ const STRINGS: Record<SupportedLanguage, Record<StringKey, string>> = {
     ADMIN_STATS_MESSAGE:
       "📊 Статистика администратора:\n\nВсего пользователей: {users_count}\nАктивных пользователей (последние 7 дней): {active_users}\nВсего слов: {words_count}\nСреднее количество слов на пользователя: {avg_words}",
   },
-  // Simplified for this example - we'll include English and Russian only
-  // with placeholders for other languages
   zh: { ...getDefaultStrings() },
   es: { ...getDefaultStrings() },
   fr: { ...getDefaultStrings() },
@@ -113,9 +133,7 @@ function getDefaultStrings(): Record<StringKey, string> {
 // Detect user language from Telegram language code
 export function detectLang(langCode?: string): SupportedLanguage {
   if (!langCode) return "en";
-
   const shortCode = langCode.toLowerCase().substring(0, 2) as SupportedLanguage;
-
   return SUPPORTED_LANGUAGES.includes(shortCode) ? shortCode : "en";
 }
 
@@ -126,13 +144,10 @@ export function getString(
   params?: Record<string, string | number>,
 ): string {
   let text = STRINGS[lang][key] || STRINGS.en[key];
-
-  // Replace parameters if provided
   if (params) {
     for (const [paramKey, paramValue] of Object.entries(params)) {
       text = text.replace(`{${paramKey}}`, String(paramValue));
     }
   }
-
   return text;
 }

@@ -1,20 +1,33 @@
 // bot/mod.ts
-import { Bot } from "https://deno.land/x/grammy@v1.18.1/mod.ts";
+import { Bot, session } from "https://deno.land/x/grammy@v1.18.1/mod.ts";
+import type {
+  Context,
+  SessionFlavor,
+} from "https://deno.land/x/grammy@v1.18.1/mod.ts";
 import { ENV } from "../config/mod.ts";
 import { logger } from "../utils/logger.ts";
 import { setupCommands } from "./commands.ts";
 import { setupCallbackHandlers, setupMessageHandlers } from "./handlers.ts";
 
-// Initialize and configure the bot
-export function createBot(): Bot {
-  // Create bot instance
-  const bot = new Bot(ENV.TG_BOT_TOKEN, {
+// Тип сессии
+interface SessionData {
+  mode: "idle" | "awaiting_words";
+}
+
+// Тип контекста с добавленным session
+export type MyContext = Context & SessionFlavor<SessionData>;
+
+// Создание и настройка бота
+export function createBot(): Bot<MyContext> {
+  const bot = new Bot<MyContext>(ENV.TG_BOT_TOKEN, {
     client: {
       canUseWebhookReply: (method) => method === "sendChatAction",
     },
   });
 
-  // Setup error handling
+  // Включаем session middleware
+  bot.use(session({ initial: (): SessionData => ({ mode: "idle" }) }));
+
   bot.catch((err) => {
     const ctx = err.ctx;
     logger.error(`Error while handling update ${ctx.update.update_id}:`);
@@ -27,7 +40,6 @@ export function createBot(): Bot {
     }
   });
 
-  // Register all handlers
   setupCommands(bot);
   setupMessageHandlers(bot);
   setupCallbackHandlers(bot);

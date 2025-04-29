@@ -5,202 +5,177 @@ import { wordService } from "../services/words.ts";
 import { aiService } from "../services/ai.ts";
 import { SupportedLanguage, WordData } from "../types.ts";
 import { getString } from "../utils/strings.ts";
+import { ENV, WORD_FORMAT } from "../config/mod.ts";
+import { adminKeyboard, mainKeyboard } from "./keyboards.ts";
+import type { MyContext } from "./mod.ts";
 import { logger } from "../utils/logger.ts";
-import { WORD_FORMAT } from "../config/mod.ts";
-import { mainKeyboard } from "./keyboards.ts";
 
-// Parse text input to words
-function parseTextToWords(text: string): WordData[] {
-  const words: WordData[] = [];
-  const lines = text.split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+function parseTextToWords(
+  text: string,
+): { words: WordData[]; invalidLines: string[] } {
+  const lines = text.split("\n").map((line) => line.trim()).filter((line) =>
+    line.length > 0
+  );
+  const validWords: WordData[] = [];
+  const invalidLines: string[] = [];
 
   for (const line of lines) {
-    const parts = line.split(WORD_FORMAT.separator)
-      .map((part) => part.trim());
+    const parts = line.split(WORD_FORMAT.separator).map((p) => p.trim());
+    let hanzi = "", pinyin = "", translation = "", word = "";
 
-    // Handle both 3-part and 4-part formats
-    if (parts.length >= 3) {
-      const word: WordData = {
-        // For 3-part format: hanzi|pinyin|translation
-        // For 4-part format: word|pinyin|hanzi|translation
-        word: parts.length === 3 ? parts[2] : parts[0],
-        pinyin: parts[1],
-        hanzi: parts.length === 3 ? parts[0] : parts[2],
-        translation: parts.length === 3 ? parts[2] : parts[3],
-      };
+    if (parts.length === 1) {
+      hanzi = word = parts[0];
+    } else if (parts.length === 2) {
+      [hanzi, translation] = parts;
+      word = hanzi;
+    } else if (parts.length >= 3) {
+      [hanzi, pinyin, translation] = parts;
+      word = hanzi;
+    }
 
-      if (isValidWord(word)) {
-        words.push(word);
-      }
+    const entry: WordData = { word, hanzi, pinyin, translation };
+
+    if (isValidWord(entry)) {
+      validWords.push(entry);
+    } else {
+      invalidLines.push(line);
     }
   }
 
-  return words;
+  return { words: validWords, invalidLines };
 }
 
-// Validate word data
 function isValidWord(word: WordData): boolean {
-  return (
-    typeof word.word === "string" &&
-    typeof word.pinyin === "string" &&
-    typeof word.hanzi === "string" &&
-    typeof word.translation === "string" &&
-    word.pinyin.length > 0 &&
-    word.hanzi.length > 0
-  );
+  return word.word.length > 0 && word.hanzi.length > 0;
 }
 
-// Setup message handlers
-export function setupMessageHandlers(bot: Bot) {
-  // Text message handler for word input
+export function setupMessageHandlers(bot: Bot<MyContext>) {
   bot.on("message:text", async (ctx) => {
+    if (ctx.message.text.startsWith("/")) return;
+
+    if (ctx.session.mode !== "awaiting_words") {
+      await ctx.reply(
+        "Чтобы добавить слова, нажмите кнопку «📌 Добавить слова».\n\nПримеры:\n" +
+          "• 你好\n• 你好 | привет\n• 你好 | nǐ hǎo | привет",
+      );
+      return;
+    }
+
     const userId = ctx.from.id;
-    const text = ctx.message.text;
-
-    logger.info(
-      `Text message from user ${userId}: ${text.substring(0, 50)}${
-        text.length > 50 ? "..." : ""
-      }`,
-    );
-
-    // Skip if it's a command
-    if (text.startsWith("/")) return;
-
-    // Get user for language
     const [user, userErr] = await userDb.getUserByTelegramId(userId);
     if (userErr || !user) {
-      logger.error(`Error getting user ${userId}: ${userErr?.message}`);
       await ctx.reply("❌ Error. Try using /start");
       return;
     }
 
     const lang = user.language as SupportedLanguage;
+    const { words, invalidLines } = parseTextToWords(ctx.message.text);
 
-    // Parse text input to words
-    try {
-      const words = parseTextToWords(text);
-
-      if (words.length === 0) {
-        logger.warn(`No valid words found in text from user ${userId}`);
-        await ctx.reply(
-          `${getString(lang, "WORDS_IMPORT_ERROR")}\n\n` +
-            `Example format: ${WORD_FORMAT.example}`,
-        );
-        return;
-      }
-
-      // Add words to database
-      const addedCount = await wordService.addWords(user.id, words);
-
-      // Confirm words added
+    if (words.length === 0) {
       await ctx.reply(
-        `${getString(lang, "WORDS_ADDED")} Words added: ${addedCount}`,
+        `${getString(lang, "WORDS_IMPORT_ERROR")}\n\nПримеры:\n` +
+          `• 你好\n• 你好 | привет\n• 你好 | nǐ hǎo | привет`,
         { reply_markup: mainKeyboard(lang) },
       );
-    } catch (error) {
-      logger.error(
-        `Error importing words for ${userId}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-      await ctx.reply(getString(lang, "WORDS_IMPORT_ERROR"));
+      return;
     }
+
+    const addedCount = await wordService.addWords(user.id, words);
+    ctx.session.mode = "idle";
+
+    let replyText = `${
+      getString(lang, "WORDS_ADDED")
+    } Words added: ${addedCount}`;
+    if (invalidLines.length > 0) {
+      replyText += `\n\n⚠️ Пропущены строки с ошибками:\n` +
+        invalidLines.map((l) => `- ${l}`).join("\n") +
+        `\n\nДопустимые форматы:\n` +
+        `• 你好\n• 你好 | привет\n• 你好 | nǐ hǎo | привет`;
+    }
+
+    await ctx.reply(replyText, {
+      reply_markup: mainKeyboard(lang),
+    });
   });
 }
 
-// Setup callback handlers
-export function setupCallbackHandlers(bot: Bot) {
-  // Language selection callback
+export function setupCallbackHandlers(bot: Bot<MyContext>) {
   bot.callbackQuery(/^lang_(.+)$/, async (ctx) => {
-    await ctx.answerCallbackQuery(); // Acknowledge the callback query immediately
-
-    const selectedLang = ctx.match![1] as SupportedLanguage;
-    const userId = ctx.from!.id;
-
-    logger.info(`User ${userId} selected language: ${selectedLang}`);
-
-    try {
+    await ctx.answerCallbackQuery().catch(() => {});
+    queueMicrotask(async () => {
+      const selectedLang = ctx.match![1] as SupportedLanguage;
+      const userId = ctx.from!.id;
       const [updatedUser, err] = await userDb.updateUserLanguage(
         userId,
         selectedLang,
       );
-
       if (err) {
-        logger.error(`Error updating language: ${err.message}`);
         await ctx.reply("❌ Error changing language");
         return;
       }
-
       await ctx.editMessageText(getString(selectedLang, "LANG_SELECTED"));
       await ctx.reply(getString(selectedLang, "ADD_WORDS_INSTRUCTION"), {
         reply_markup: mainKeyboard(selectedLang),
       });
-    } catch (e) {
-      logger.error(
-        `Error in language selection: ${
-          e instanceof Error ? e.message : String(e)
-        }`,
-      );
-      await ctx.reply("❌ Error changing language");
-    }
+    });
   });
 
-  // Task request callback
   bot.callbackQuery("get_task", async (ctx) => {
-    await ctx.answerCallbackQuery(); // Acknowledge the callback query immediately
-
-    const userId = ctx.from!.id;
-    logger.info(`Processing task request from user ${userId}`);
-
-    try {
-      const [user, userErr] = await userDb.getUserByTelegramId(userId);
-      if (userErr || !user) {
-        logger.error(`Error getting user ${userId}: ${userErr?.message}`);
-        await ctx.reply("❌ User not found");
-        return;
-      }
-
-      const lang = user.language as SupportedLanguage;
-
-      // Check if user has words
-      const wordCount = await wordService.getUserWordCount(user.id);
-
-      if (wordCount === 0) {
-        await ctx.reply(getString(lang, "NO_WORDS_ERROR"), {
-          reply_markup: mainKeyboard(lang),
-        });
-        return;
-      }
-
-      // Get least used words for task
-      const words = await wordService.getLeastUsedWords(user.id, 10);
-
+    await ctx.answerCallbackQuery({
+      text: "⏳ Подбираем задание...",
+      show_alert: false,
+    }).catch(() => {});
+    ctx.session.mode = "idle";
+    queueMicrotask(async () => {
       try {
-        // Generate sentences with AI
-        const result = await aiService.generateSentences(words, lang);
+        const userId = ctx.from!.id;
+        const [user, userErr] = await userDb.getUserByTelegramId(userId);
+        if (userErr || !user) {
+          await ctx.reply("❌ User not found");
+          return;
+        }
 
-        if (
-          !result.success || !result.sentences || result.sentences.length === 0
-        ) {
+        const lang = user.language as SupportedLanguage;
+        const wordCount = await wordService.getUserWordCount(user.id);
+        if (wordCount === 0) {
+          await ctx.reply(getString(lang, "NO_WORDS_ERROR"), {
+            reply_markup: mainKeyboard(lang),
+          });
+          return;
+        }
+
+        const words = await wordService.getLeastUsedWords(user.id, 10);
+        const result = await aiService.generateSentences(words, lang);
+        // console.log(result);
+        if (!result.success || (result.sentences ?? []).length === 0) {
           throw new Error(result.error || "No sentences generated");
         }
 
-        // Update word usage statistics
-        const wordIds = words.map((w) => w.id);
-        await wordService.updateWordsUsage(user.id, wordIds);
+        const usedWords = words.filter((w) =>
+          result.sentences!.some((sentence) => sentence.includes(w.hanzi))
+        );
+        const usedWordIds = usedWords.map((w) => w.id);
+        await wordService.updateWordsUsage(user.id, usedWordIds);
 
-        // Format and send task message with spoiler for answers
+        const translated: string[] = [];
+        const chinese: string[] = [];
+
+        for (const line of result.sentences ?? []) {
+          const [tr, zh] = line.split("||").map((s) => s.trim());
+          if (tr && zh) {
+            translated.push(tr);
+            chinese.push(zh);
+          }
+        }
+
         const taskMessage = [
           getString(lang, "TASK_PROMPT"),
           "",
-          ...result.sentences.map((s, i) => `${i + 1}. ${s}`),
+          ...translated.map((tr, i) => `${i + 1}. ${tr}`),
           "",
-          "🔍 Answers (tap to reveal):",
+          "🔍 Chinese originals (tap to reveal):",
           `<tg-spoiler>${
-            words.map((w) => `${w.hanzi} (${w.pinyin}) - ${w.translation}`)
-              .join("\n")
+            chinese.map((zh, i) => `${i + 1}. ${zh}`).join("\n")
           }</tg-spoiler>`,
           "",
           "📊 Updated word frequencies:",
@@ -213,71 +188,40 @@ export function setupCallbackHandlers(bot: Bot) {
           reply_markup: mainKeyboard(lang),
           parse_mode: "HTML",
         });
-      } catch (error) {
-        logger.error(
-          `AI provider error: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-        await ctx.reply(getString(lang, "TASK_GENERATION_ERROR"), {
-          reply_markup: mainKeyboard(lang),
-        });
+      } catch {
+        await ctx.reply("❌ Error getting task");
       }
-    } catch (e) {
-      logger.error(
-        `Error getting task: ${e instanceof Error ? e.message : String(e)}`,
-      );
-      await ctx.reply("❌ Error getting task");
-    }
+    });
   });
 
-  // Add words button callback
   bot.callbackQuery("add_words", async (ctx) => {
-    await ctx.answerCallbackQuery(); // Acknowledge the callback query immediately
-
-    const userId = ctx.from!.id;
-    logger.info(`User ${userId} requested to add words`);
-
-    try {
+    await ctx.answerCallbackQuery().catch(() => {});
+    ctx.session.mode = "awaiting_words";
+    queueMicrotask(async () => {
+      const userId = ctx.from!.id;
       const [user, userErr] = await userDb.getUserByTelegramId(userId);
       if (userErr || !user) {
-        logger.error(`Error getting user ${userId}: ${userErr?.message}`);
         await ctx.reply("❌ User not found");
         return;
       }
-
       const lang = user.language as SupportedLanguage;
       await ctx.reply(getString(lang, "ADD_WORDS_INSTRUCTION"), {
         reply_markup: mainKeyboard(lang),
       });
-    } catch (e) {
-      logger.error(
-        `Error in add_words handler: ${
-          e instanceof Error ? e.message : String(e)
-        }`,
-      );
-      await ctx.reply("❌ Error");
-    }
+    });
   });
 
-  // Reset words callback
   bot.callbackQuery("reset_words", async (ctx) => {
-    await ctx.answerCallbackQuery(); // Acknowledge the callback query immediately
-
-    const userId = ctx.from!.id;
-    logger.info(`User ${userId} requested to reset words`);
-
-    try {
+    await ctx.answerCallbackQuery().catch(() => {});
+    ctx.session.mode = "idle";
+    queueMicrotask(async () => {
+      const userId = ctx.from!.id;
       const [user, userErr] = await userDb.getUserByTelegramId(userId);
       if (userErr || !user) {
-        logger.error(`Error getting user ${userId}: ${userErr?.message}`);
         await ctx.reply("❌ User not found");
         return;
       }
-
       const lang = user.language as SupportedLanguage;
-
-      // Ask for confirmation
       await ctx.reply(getString(lang, "RESET_CONFIRMATION"), {
         reply_markup: {
           inline_keyboard: [
@@ -294,75 +238,71 @@ export function setupCallbackHandlers(bot: Bot) {
           ],
         },
       });
-    } catch (e) {
-      logger.error(
-        `Error in reset_words handler: ${
-          e instanceof Error ? e.message : String(e)
-        }`,
-      );
-      await ctx.reply("❌ Error");
-    }
+    });
   });
 
-  // Reset confirmation callbacks
   bot.callbackQuery("reset_confirm_yes", async (ctx) => {
-    await ctx.answerCallbackQuery(); // Acknowledge the callback query immediately
-
-    const userId = ctx.from!.id;
-    logger.info(`User ${userId} confirmed resetting words`);
-
-    try {
+    await ctx.answerCallbackQuery().catch(() => {});
+    ctx.session.mode = "idle";
+    queueMicrotask(async () => {
+      const userId = ctx.from!.id;
       const [user, userErr] = await userDb.getUserByTelegramId(userId);
       if (userErr || !user) {
-        logger.error(`Error getting user ${userId}: ${userErr?.message}`);
         await ctx.reply("❌ User not found");
         return;
       }
-
       const lang = user.language as SupportedLanguage;
-
-      // Reset words
       await wordService.resetWords(user.id);
-
       await ctx.editMessageText(getString(lang, "RESET_SUCCESS"), {
         reply_markup: mainKeyboard(lang),
       });
-    } catch (e) {
-      logger.error(
-        `Error in reset confirmation: ${
-          e instanceof Error ? e.message : String(e)
-        }`,
-      );
-      await ctx.reply("❌ Error resetting words");
-    }
+    });
   });
 
   bot.callbackQuery("reset_confirm_no", async (ctx) => {
-    await ctx.answerCallbackQuery(); // Acknowledge the callback query immediately
-
-    const userId = ctx.from!.id;
-    logger.info(`User ${userId} canceled reset operation`);
-
-    try {
+    await ctx.answerCallbackQuery().catch(() => {});
+    ctx.session.mode = "idle";
+    queueMicrotask(async () => {
+      const userId = ctx.from!.id;
       const [user, userErr] = await userDb.getUserByTelegramId(userId);
       if (userErr || !user) {
-        logger.error(`Error getting user ${userId}: ${userErr?.message}`);
         await ctx.reply("❌ User not found");
         return;
       }
-
       const lang = user.language as SupportedLanguage;
-
       await ctx.editMessageText(getString(lang, "RESET_CANCELED"), {
         reply_markup: mainKeyboard(lang),
       });
-    } catch (e) {
-      logger.error(
-        `Error in reset cancellation: ${
-          e instanceof Error ? e.message : String(e)
-        }`,
+    });
+  });
+
+  bot.callbackQuery("admin_stats", async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    ctx.session.mode = "idle";
+    queueMicrotask(async () => {
+      const userId = ctx.from!.id.toString();
+      if (userId !== ENV.ADMIN_ID) {
+        await ctx.reply("⛔ You don't have permission to use this command.");
+        return;
+      }
+      const [user, userErr] = await userDb.getUserByTelegramId(
+        parseInt(userId),
       );
-      await ctx.reply("❌ Error");
-    }
+      if (userErr || !user) {
+        await ctx.reply("❌ User not found");
+        return;
+      }
+      const lang = user.language as SupportedLanguage;
+      const stats = await wordService.getGlobalStats();
+      const statsMessage = getString(lang, "ADMIN_STATS_MESSAGE", {
+        users_count: stats.usersCount,
+        active_users: stats.activeUsers,
+        words_count: stats.wordsCount,
+        avg_words_per_user: stats.avgWordsPerUser,
+      });
+      await ctx.reply(statsMessage, {
+        reply_markup: adminKeyboard(lang),
+      });
+    });
   });
 }

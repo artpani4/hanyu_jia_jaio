@@ -7,10 +7,11 @@ import { detectLang, getString } from "../utils/strings.ts";
 import { logger } from "../utils/logger.ts";
 import { adminKeyboard, languageKeyboard, mainKeyboard } from "./keyboards.ts";
 import { ENV } from "../config/mod.ts";
+import type { MyContext } from "./mod.ts";
 
 // Bot command handlers
-export function setupCommands(bot: Bot) {
-  // Start command
+export function setupCommands(bot: Bot<MyContext>) {
+  // /start
   bot.command("start", async (ctx) => {
     const user = ctx.from!;
     logger.info(`/start from ${user.id} (${user.username ?? "no_username"})`);
@@ -28,12 +29,12 @@ export function setupCommands(bot: Bot) {
       }
 
       const lang = dbUser?.language as SupportedLanguage ?? "en";
+      ctx.session.mode = "idle";
 
       await ctx.reply(getString(lang, "WELCOME_MESSAGE"), {
         reply_markup: languageKeyboard,
       });
 
-      // Use admin keyboard if user is admin
       const keyboard = user.id.toString() === ENV.ADMIN_ID
         ? adminKeyboard(lang)
         : mainKeyboard(lang);
@@ -49,11 +50,12 @@ export function setupCommands(bot: Bot) {
     }
   });
 
-  // Language command
+  // /language
   bot.command("language", async (ctx) => {
     try {
-      const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
+      ctx.session.mode = "idle";
 
+      const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
       if (err) {
         logger.error(`Error getting user for language: ${err.message}`);
         await ctx.reply("🚫 An error occurred. Please try again later.");
@@ -73,11 +75,12 @@ export function setupCommands(bot: Bot) {
     }
   });
 
-  // Help command
+  // /help
   bot.command("help", async (ctx) => {
     try {
-      const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
+      ctx.session.mode = "idle";
 
+      const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
       if (err) {
         logger.error(`Error getting user for help: ${err.message}`);
         await ctx.reply("🚫 An error occurred. Please try again later.");
@@ -95,11 +98,12 @@ export function setupCommands(bot: Bot) {
     }
   });
 
-  // Stats command - new command for word statistics
+  // /stats
   bot.command("stats", async (ctx) => {
     try {
-      const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
+      ctx.session.mode = "idle";
 
+      const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
       if (err) {
         logger.error(`Error getting user for stats: ${err.message}`);
         await ctx.reply("🚫 An error occurred. Please try again later.");
@@ -107,8 +111,6 @@ export function setupCommands(bot: Bot) {
       }
 
       const lang = user?.language as SupportedLanguage ?? "en";
-
-      // Get word count first to check if user has any words
       const wordCount = await wordService.getUserWordCount(user.id);
 
       if (wordCount === 0) {
@@ -120,16 +122,13 @@ export function setupCommands(bot: Bot) {
         return;
       }
 
-      // Get detailed stats
       const stats = await wordService.getWordStats(user.id);
 
-      // Format top words
       const topWordsText = stats.topWords.length > 0
         ? stats.topWords.map((w, i) => `${i + 1}. ${w.word} (${w.timesUsed})`)
           .join("\n")
         : "-";
 
-      // Build and send stats message
       const statsMessage = getString(lang, "STATS_MESSAGE", {
         total: stats.total,
         used: stats.used,
@@ -150,11 +149,12 @@ export function setupCommands(bot: Bot) {
     }
   });
 
-  // Reset command - allows users to reset their words
+  // /reset
   bot.command("reset", async (ctx) => {
     try {
-      const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
+      ctx.session.mode = "idle";
 
+      const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
       if (err) {
         logger.error(`Error getting user for reset: ${err.message}`);
         await ctx.reply("🚫 An error occurred. Please try again later.");
@@ -163,7 +163,6 @@ export function setupCommands(bot: Bot) {
 
       const lang = user?.language as SupportedLanguage ?? "en";
 
-      // Ask for confirmation
       await ctx.reply(getString(lang, "RESET_CONFIRMATION"), {
         reply_markup: {
           inline_keyboard: [
@@ -188,12 +187,12 @@ export function setupCommands(bot: Bot) {
     }
   });
 
-  // Admin command to get global statistics
+  // /admin
   bot.command("admin", async (ctx) => {
     try {
-      const userId = ctx.from!.id.toString();
+      ctx.session.mode = "idle";
 
-      // Check if user is admin
+      const userId = ctx.from!.id.toString();
       if (userId !== ENV.ADMIN_ID) {
         logger.warn(`Non-admin user ${userId} tried to access admin stats`);
         await ctx.reply("⛔ You don't have permission to use this command.");
@@ -201,7 +200,6 @@ export function setupCommands(bot: Bot) {
       }
 
       const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
-
       if (err) {
         logger.error(`Error getting admin user: ${err.message}`);
         await ctx.reply("🚫 An error occurred. Please try again later.");
@@ -209,11 +207,8 @@ export function setupCommands(bot: Bot) {
       }
 
       const lang = user?.language as SupportedLanguage ?? "en";
-
-      // Get global stats
       const stats = await wordService.getGlobalStats();
 
-      // Format and send message
       const statsMessage = getString(lang, "ADMIN_STATS_MESSAGE", {
         users_count: stats.usersCount,
         active_users: stats.activeUsers,
@@ -232,7 +227,7 @@ export function setupCommands(bot: Bot) {
     }
   });
 
-  // Set up commands in Telegram menu
+  // Setup commands for Telegram menu
   const setupBotCommands = async () => {
     try {
       await bot.api.setMyCommands([
@@ -252,6 +247,5 @@ export function setupCommands(bot: Bot) {
     }
   };
 
-  // Run setup on initialization
   setupBotCommands();
 }

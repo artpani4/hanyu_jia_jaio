@@ -1,59 +1,64 @@
 // services/ai.ts
 import { OpenAI } from "https://esm.sh/openai@4.20.1";
 import { AIResponse, KVWord, SupportedLanguage } from "../types.ts";
-
 import { logger } from "../utils/logger.ts";
 import { AI_CONFIG, ENV } from "../config/mod.ts";
 
-// Initialize OpenAI client (used for DeepSeek)
 const openai = new OpenAI({
   apiKey: ENV.DEEPSEEK_API_KEY,
-  baseURL: "https://api.deepseek.com", // DeepSeek API endpoint
+  baseURL: "https://api.deepseek.com",
 });
 
-// AI service for sentence generation
 export const aiService = {
-  // Generate sentences using DeepSeek
   async generateSentences(
     words: KVWord[],
     language: SupportedLanguage,
   ): Promise<AIResponse> {
     try {
       logger.info(
-        `Generating sentences with ${words.length} words in ${language}`,
+        `🔤 Generating sentences using ${words.length} words in ${language}`,
       );
 
-      // Extract just the word text for the prompt
       const wordTexts = words.map((w) => w.word);
-
-      // Create prompt from configuration
       const prompt = AI_CONFIG.taskPrompt(wordTexts, language);
 
-      // Call DeepSeek API
       const completion = await openai.chat.completions.create({
         model: AI_CONFIG.model,
         messages: [{ role: "user", content: prompt }],
         temperature: AI_CONFIG.temperature,
       });
 
-      // Extract the response text
       const responseText = completion.choices[0]?.message?.content ?? "";
+      logger.info("📨 Raw DeepSeek response:\n" + responseText);
 
-      // Parse the response into separate sentences
-      const sentences = this.parseResponse(responseText);
+      const { chinese, translated } = this.parseResponse(responseText);
 
-      if (sentences.length === 0) {
-        throw new Error("No sentences generated");
+      logger.info(
+        `🇨🇳 Parsed Chinese (${chinese.length} lines):\n` + chinese.join("\n"),
+      );
+      logger.info(
+        `🌍 Parsed Translations (${translated.length} lines):\n` +
+          translated.join("\n"),
+      );
+
+      if (chinese.length === 0 || translated.length === 0) {
+        throw new Error("No valid sentences returned");
       }
 
-      logger.info(`Successfully generated ${sentences.length} sentences`);
+      const sentences = translated.map((t, i) =>
+        `${t} || ${chinese[i] ?? "-"}`
+      );
+
+      logger.info(
+        `✅ Successfully generated ${sentences.length} sentence pairs`,
+      );
       return {
         success: true,
         sentences,
       };
     } catch (error) {
       logger.error(
-        `Error generating sentences: ${
+        `❌ Error generating sentences: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
@@ -64,11 +69,27 @@ export const aiService = {
     }
   },
 
-  // Parse the response from DeepSeek into sentences
-  parseResponse(response: string): string[] {
-    return response
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+  parseResponse(response: string): {
+    chinese: string[];
+    translated: string[];
+  } {
+    const sections = response.split(/\n\s*-{3,}\s*\n/);
+
+    if (sections.length < 2) {
+      logger.warn("⚠️ Could not split response on separator (---)");
+    }
+
+    const [rawChinese = "", rawTranslated = ""] = sections;
+
+    const clean = (text: string) =>
+      text
+        .split("\n")
+        .map((l) => l.replace(/^\d+\.?\s*/, "").trim())
+        .filter((l) => l.length > 0);
+
+    return {
+      chinese: clean(rawChinese),
+      translated: clean(rawTranslated),
+    };
   },
 };

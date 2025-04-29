@@ -42,21 +42,25 @@ export const AI_CONFIG = {
   model: "deepseek-chat",
   temperature: 0.7,
   taskPrompt: (words: string[], language: SupportedLanguage) => `
-    You are a language learning assistant for Chinese.
-    Create 3-5 meaningful sentences or phrases in ${language} using the following Chinese words: ${
-    words.join(", ")
-  }.
-    
-    Important guidelines:
-    1. If words can be logically combined into a coherent sentence, please do so.
-    2. If certain words don't fit well together, it's better to create separate phrases for those words.
-    3. Don't force all words into a single sentence if it doesn't make sense.
-    4. Create natural, useful sentences that a language learner would benefit from.
-    5. Try to keep sentences relatively simple and practical.
-    
-    Return ONLY the sentences/phrases in ${language}, with no translations or additional comments.
-    Format: one sentence or phrase per line.
-  `,
+你是一个中文学习助手。
+
+请用下列中文词语：${
+    words.join("，")
+  }，写出三到五个简单、自然、实用的中文句子，每句占一行，不要编号，也不要加标题。
+
+然后在新的一行写：---
+
+接着写出对应的${
+    language === "ru" ? "俄语" : language
+  }翻译，每句一行，顺序对应上面中文句子。不要编号，也不要加标题。
+
+示例：
+我喜欢学习中文。
+我们一起去吃饭吧。
+---
+Мне нравится учить китайский.
+Пойдём поедим вместе.
+`,
 };
 
 // Feature configuration
@@ -68,9 +72,9 @@ export const FEATURES = {
   },
 };
 
-// Word format configuration
 export const WORD_FORMAT = {
   separator: "|",
-  exampleFormat: "слово|пиньинь|иероглиф|перевод",
-  example: "hello|nǐ hǎo|你好|привет",
+  exampleFormat:
+    "иероглиф | пиньинь | перевод — или: иероглиф | перевод — или просто иероглиф",
+  example: "你好 | nǐ hǎo | привет",
 };

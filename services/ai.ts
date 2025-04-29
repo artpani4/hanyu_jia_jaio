@@ -1,8 +1,9 @@
 // services/ai.ts
 import { OpenAI } from "https://esm.sh/openai@4.20.1";
 import { AIResponse, KVWord, SupportedLanguage } from "../types.ts";
-import { AI_CONFIG, ENV } from "../config.ts";
+
 import { logger } from "../utils/logger.ts";
+import { AI_CONFIG, ENV } from "../config/mod.ts";
 
 // Initialize OpenAI client (used for DeepSeek)
 const openai = new OpenAI({

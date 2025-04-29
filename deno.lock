@@ -1,6 +1,7 @@
 {
   "version": "4",
   "specifiers": {
+    "jsr:@artpani/tuner@0.6.7": "0.6.7",
     "jsr:@hono/hono@^4.7.7": "4.7.7",
     "jsr:@openai/openai@*": "4.96.0",
     "jsr:@std/fmt@0.224.0": "0.224.0",
@@ -18,6 +19,14 @@
     "npm:@types/node@*": "22.12.0"
   },
   "jsr": {
+    "@artpani/tuner@0.6.7": {
+      "integrity": "3448b06aa7e65d8b044b0e991293a36b3588f9921fbd43a86031aa037055b194",
+      "dependencies": [
+        "jsr:@std/fs",
+        "jsr:@std/path@^1.0.2",
+        "jsr:@vseplet/luminous"
+      ]
+    },
     "@hono/hono@4.7.7": {
       "integrity": "74ea9985cb405fada079a922538f6baa06fa1ee150ce409c5bdae2c89ac05cba"
     },
@@ -538,6 +547,7 @@
   },
   "workspace": {
     "dependencies": [
+      "jsr:@artpani/tuner@0.6.7",
       "jsr:@hono/hono@^4.7.7",
       "jsr:@openai/openai@*",
       "jsr:@supabase/supabase-js@^2.49.1",

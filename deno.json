@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "dev": "deno run -A  --unstable-kv main.ts",
+    "dev": "deno run -A --unstable-kv main.ts",
     "webhook": "deno run -A service/helpers/setWebhook.ts",
     "start": "dxd vault run \"deno task dev\""
   },
@@ -16,7 +16,7 @@
     "@hono/": "https://deno.land/x/hono@v4.3.11/",
     "@grammy": "https://deno.land/x/grammy/mod.ts",
     "@supabase/supabase-js": "jsr:@supabase/supabase-js@^2.49.1",
-    "@artpani/tuner": "https://deno.land/x/tuner@v0.6.7/mod.ts?source",
+    "@artpani/tuner": "jsr:@artpani/tuner@0.6.7",
     "@vseplet/luminous": "jsr:@vseplet/luminous@1.0.6",
     "openai": "jsr:@openai/openai"
   }

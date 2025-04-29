@@ -1,6 +1,6 @@
 // services/db.ts
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
-import { ENV } from "../config.ts";
+import { ENV } from "../config/mod.ts";
 import { SupportedLanguage, User } from "../types.ts";
 import { logger } from "../utils/logger.ts";
 
@@ -21,7 +21,10 @@ export const userDb = {
     try {
       const { data: user, error } = await supabase
         .from("users")
-        .upsert({ telegram_id, ...data }, { onConflict: "telegram_id" })
+        .upsert({
+          telegram_id,
+          ...data,
+        }, { onConflict: "telegram_id" })
         .select()
         .single();
 
@@ -85,6 +88,39 @@ export const userDb = {
     } catch (e) {
       logger.error(
         `Exception in updateUserLanguage: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+      return [null, e instanceof Error ? e : new Error(String(e))] as const;
+    }
+  },
+
+  // Get counts for admin statistics
+  async getAdminStats() {
+    try {
+      // Get total users count
+      const { count: totalUsers, error: countError } = await supabase
+        .from("users")
+        .select("*", { count: "exact", head: true });
+
+      if (countError) {
+        logger.error(`Error getting user count: ${countError.message}`);
+        return [null, countError] as const;
+      }
+
+      // Since we don't track last_activity, we'll use total users as active users
+      const activeUsers = totalUsers;
+
+      return [
+        {
+          totalUsers: totalUsers || 0,
+          activeUsers: activeUsers || 0,
+        },
+        null,
+      ] as const;
+    } catch (e) {
+      logger.error(
+        `Exception in getAdminStats: ${
           e instanceof Error ? e.message : String(e)
         }`,
       );

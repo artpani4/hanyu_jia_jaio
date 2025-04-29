@@ -6,21 +6,8 @@ import { aiService } from "../services/ai.ts";
 import { SupportedLanguage, WordData } from "../types.ts";
 import { getString } from "../utils/strings.ts";
 import { logger } from "../utils/logger.ts";
-import { WORD_FORMAT } from "../config.ts";
+import { WORD_FORMAT } from "../config/mod.ts";
 import { mainKeyboard } from "./keyboards.ts";
-
-// Set of processed callback IDs to prevent duplicates
-const processedCallbackIds = new Set<string>();
-const MAX_PROCESSED_IDS = 100;
-
-// Add to processed IDs with size limit
-function addProcessedId(id: string) {
-  processedCallbackIds.add(id);
-  if (processedCallbackIds.size > MAX_PROCESSED_IDS) {
-    const firstId = processedCallbackIds.values().next().value;
-    processedCallbackIds.delete(firstId);
-  }
-}
 
 // Parse text input to words
 function parseTextToWords(text: string): WordData[] {
@@ -127,19 +114,12 @@ export function setupMessageHandlers(bot: Bot) {
 export function setupCallbackHandlers(bot: Bot) {
   // Language selection callback
   bot.callbackQuery(/^lang_(.+)$/, async (ctx) => {
-    // Check for duplicate callbacks
-    const callbackId = ctx.callbackQuery.id;
-    if (processedCallbackIds.has(callbackId)) {
-      logger.debug(`Duplicate callback (language): ${callbackId}, ignoring`);
-      await ctx.answerCallbackQuery();
-      return;
-    }
-
-    // Mark as processed
-    addProcessedId(callbackId);
+    await ctx.answerCallbackQuery(); // Acknowledge the callback query immediately
 
     const selectedLang = ctx.match![1] as SupportedLanguage;
     const userId = ctx.from!.id;
+
+    logger.info(`User ${userId} selected language: ${selectedLang}`);
 
     try {
       const [updatedUser, err] = await userDb.updateUserLanguage(
@@ -149,45 +129,32 @@ export function setupCallbackHandlers(bot: Bot) {
 
       if (err) {
         logger.error(`Error updating language: ${err.message}`);
-        await ctx.answerCallbackQuery("❌ Error changing language");
+        await ctx.reply("❌ Error changing language");
         return;
       }
 
       await ctx.editMessageText(getString(selectedLang, "LANG_SELECTED"));
-      await ctx.reply(getString(selectedLang, "ADD_WORDS_INSTRUCTION"));
-
-      await ctx.answerCallbackQuery();
+      await ctx.reply(getString(selectedLang, "ADD_WORDS_INSTRUCTION"), {
+        reply_markup: mainKeyboard(selectedLang),
+      });
     } catch (e) {
       logger.error(
         `Error in language selection: ${
           e instanceof Error ? e.message : String(e)
         }`,
       );
-      await ctx.answerCallbackQuery("❌ Error");
+      await ctx.reply("❌ Error changing language");
     }
   });
 
   // Task request callback
   bot.callbackQuery("get_task", async (ctx) => {
-    // Check for duplicate callbacks
-    const callbackId = ctx.callbackQuery.id;
-    if (processedCallbackIds.has(callbackId)) {
-      logger.debug(`Duplicate callback (get_task): ${callbackId}, ignoring`);
-      await ctx.answerCallbackQuery();
-      return;
-    }
-
-    logger.info(`Processing task request, ID: ${callbackId}`);
-
-    // Mark as processed
-    addProcessedId(callbackId);
+    await ctx.answerCallbackQuery(); // Acknowledge the callback query immediately
 
     const userId = ctx.from!.id;
+    logger.info(`Processing task request from user ${userId}`);
 
     try {
-      // Answer callback immediately
-      await ctx.answerCallbackQuery();
-
       const [user, userErr] = await userDb.getUserByTelegramId(userId);
       if (userErr || !user) {
         logger.error(`Error getting user ${userId}: ${userErr?.message}`);
@@ -201,7 +168,9 @@ export function setupCallbackHandlers(bot: Bot) {
       const wordCount = await wordService.getUserWordCount(user.id);
 
       if (wordCount === 0) {
-        await ctx.reply(getString(lang, "NO_WORDS_ERROR"));
+        await ctx.reply(getString(lang, "NO_WORDS_ERROR"), {
+          reply_markup: mainKeyboard(lang),
+        });
         return;
       }
 
@@ -222,15 +191,27 @@ export function setupCallbackHandlers(bot: Bot) {
         const wordIds = words.map((w) => w.id);
         await wordService.updateWordsUsage(user.id, wordIds);
 
-        // Format and send task message
+        // Format and send task message with spoiler for answers
         const taskMessage = [
           getString(lang, "TASK_PROMPT"),
           "",
           ...result.sentences.map((s, i) => `${i + 1}. ${s}`),
+          "",
+          "🔍 Answers (tap to reveal):",
+          `<tg-spoiler>${
+            words.map((w) => `${w.hanzi} (${w.pinyin}) - ${w.translation}`)
+              .join("\n")
+          }</tg-spoiler>`,
+          "",
+          "📊 Updated word frequencies:",
+          words.map((w) => `${w.hanzi}: used ${w.times_used + 1} time(s)`).join(
+            "\n",
+          ),
         ].join("\n");
 
         await ctx.reply(taskMessage, {
           reply_markup: mainKeyboard(lang),
+          parse_mode: "HTML",
         });
       } catch (error) {
         logger.error(
@@ -247,6 +228,141 @@ export function setupCallbackHandlers(bot: Bot) {
         `Error getting task: ${e instanceof Error ? e.message : String(e)}`,
       );
       await ctx.reply("❌ Error getting task");
+    }
+  });
+
+  // Add words button callback
+  bot.callbackQuery("add_words", async (ctx) => {
+    await ctx.answerCallbackQuery(); // Acknowledge the callback query immediately
+
+    const userId = ctx.from!.id;
+    logger.info(`User ${userId} requested to add words`);
+
+    try {
+      const [user, userErr] = await userDb.getUserByTelegramId(userId);
+      if (userErr || !user) {
+        logger.error(`Error getting user ${userId}: ${userErr?.message}`);
+        await ctx.reply("❌ User not found");
+        return;
+      }
+
+      const lang = user.language as SupportedLanguage;
+      await ctx.reply(getString(lang, "ADD_WORDS_INSTRUCTION"), {
+        reply_markup: mainKeyboard(lang),
+      });
+    } catch (e) {
+      logger.error(
+        `Error in add_words handler: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+      await ctx.reply("❌ Error");
+    }
+  });
+
+  // Reset words callback
+  bot.callbackQuery("reset_words", async (ctx) => {
+    await ctx.answerCallbackQuery(); // Acknowledge the callback query immediately
+
+    const userId = ctx.from!.id;
+    logger.info(`User ${userId} requested to reset words`);
+
+    try {
+      const [user, userErr] = await userDb.getUserByTelegramId(userId);
+      if (userErr || !user) {
+        logger.error(`Error getting user ${userId}: ${userErr?.message}`);
+        await ctx.reply("❌ User not found");
+        return;
+      }
+
+      const lang = user.language as SupportedLanguage;
+
+      // Ask for confirmation
+      await ctx.reply(getString(lang, "RESET_CONFIRMATION"), {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: getString(lang, "CONFIRM_YES"),
+                callback_data: "reset_confirm_yes",
+              },
+              {
+                text: getString(lang, "CONFIRM_NO"),
+                callback_data: "reset_confirm_no",
+              },
+            ],
+          ],
+        },
+      });
+    } catch (e) {
+      logger.error(
+        `Error in reset_words handler: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+      await ctx.reply("❌ Error");
+    }
+  });
+
+  // Reset confirmation callbacks
+  bot.callbackQuery("reset_confirm_yes", async (ctx) => {
+    await ctx.answerCallbackQuery(); // Acknowledge the callback query immediately
+
+    const userId = ctx.from!.id;
+    logger.info(`User ${userId} confirmed resetting words`);
+
+    try {
+      const [user, userErr] = await userDb.getUserByTelegramId(userId);
+      if (userErr || !user) {
+        logger.error(`Error getting user ${userId}: ${userErr?.message}`);
+        await ctx.reply("❌ User not found");
+        return;
+      }
+
+      const lang = user.language as SupportedLanguage;
+
+      // Reset words
+      await wordService.resetWords(user.id);
+
+      await ctx.editMessageText(getString(lang, "RESET_SUCCESS"), {
+        reply_markup: mainKeyboard(lang),
+      });
+    } catch (e) {
+      logger.error(
+        `Error in reset confirmation: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+      await ctx.reply("❌ Error resetting words");
+    }
+  });
+
+  bot.callbackQuery("reset_confirm_no", async (ctx) => {
+    await ctx.answerCallbackQuery(); // Acknowledge the callback query immediately
+
+    const userId = ctx.from!.id;
+    logger.info(`User ${userId} canceled reset operation`);
+
+    try {
+      const [user, userErr] = await userDb.getUserByTelegramId(userId);
+      if (userErr || !user) {
+        logger.error(`Error getting user ${userId}: ${userErr?.message}`);
+        await ctx.reply("❌ User not found");
+        return;
+      }
+
+      const lang = user.language as SupportedLanguage;
+
+      await ctx.editMessageText(getString(lang, "RESET_CANCELED"), {
+        reply_markup: mainKeyboard(lang),
+      });
+    } catch (e) {
+      logger.error(
+        `Error in reset cancellation: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+      await ctx.reply("❌ Error");
     }
   });
 }

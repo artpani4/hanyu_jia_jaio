@@ -180,4 +180,73 @@ export const wordService = {
       throw e;
     }
   },
+
+  // Reset all words for a user
+  async resetWords(userId: string): Promise<void> {
+    try {
+      const atomic = kv.atomic();
+      const entries = kv.list({ prefix: ["users", userId, "words"] });
+
+      for await (const entry of entries) {
+        atomic.delete(entry.key);
+      }
+
+      await atomic.commit();
+      logger.info(`Reset all words for user ${userId}`);
+    } catch (e) {
+      logger.error(
+        `Error resetting words: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      throw e;
+    }
+  },
+
+  // Get global stats for admin
+  async getGlobalStats(): Promise<{
+    usersCount: number;
+    activeUsers: number;
+    wordsCount: number;
+    avgWordsPerUser: number;
+  }> {
+    try {
+      // Get all users
+      const userIds = new Set<string>();
+      const userEntries = kv.list({ prefix: ["users"] });
+
+      for await (const entry of userEntries) {
+        if (entry.key.length >= 2) {
+          userIds.add(String(entry.key[1])); // The user ID is the second component in the key
+        }
+      }
+
+      // Count total words
+      let wordsCount = 0;
+      for (const userId of userIds) {
+        wordsCount += await this.getUserWordCount(userId);
+      }
+
+      // Calculate average
+      const usersCount = userIds.size;
+      const avgWordsPerUser = usersCount > 0
+        ? Math.round(wordsCount / usersCount)
+        : 0;
+
+      // For simplicity, active users is just the total users (would need timestamps in real app)
+      const activeUsers = usersCount;
+
+      return {
+        usersCount,
+        activeUsers,
+        wordsCount,
+        avgWordsPerUser,
+      };
+    } catch (e) {
+      logger.error(
+        `Error getting global stats: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+      throw e;
+    }
+  },
 };

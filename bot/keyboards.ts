@@ -16,8 +16,21 @@ export const languageKeyboard = new InlineKeyboard()
   .text("🇮🇹 Italiano", "lang_it")
   .text("🇵🇹 Português", "lang_pt");
 
-// Main keyboard with task button
+// Main keyboard with task and word management buttons
 export function mainKeyboard(lang: SupportedLanguage): InlineKeyboard {
   return new InlineKeyboard()
-    .text(getString(lang, "GET_TASK_BUTTON"), "get_task");
+    .text(getString(lang, "GET_TASK_BUTTON"), "get_task")
+    .text(getString(lang, "ADD_WORDS_BUTTON"), "add_words")
+    .row()
+    .text(getString(lang, "RESET_WORDS_BUTTON"), "reset_words");
+}
+
+// Admin keyboard with additional functionality
+export function adminKeyboard(lang: SupportedLanguage): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(getString(lang, "GET_TASK_BUTTON"), "get_task")
+    .text(getString(lang, "ADD_WORDS_BUTTON"), "add_words")
+    .row()
+    .text(getString(lang, "RESET_WORDS_BUTTON"), "reset_words")
+    .text(getString(lang, "ADMIN_STATS_BUTTON"), "admin_stats");
 }

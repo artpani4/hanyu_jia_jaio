@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "dev": "deno run -A  --unstable-kv service/main.ts",
+    "dev": "deno run -A  --unstable-kv main.ts",
     "webhook": "deno run -A service/helpers/setWebhook.ts",
     "start": "dxd vault run \"deno task dev\""
   },

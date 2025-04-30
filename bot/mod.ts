@@ -6,8 +6,11 @@ import type {
 } from "https://deno.land/x/grammy@v1.18.1/mod.ts";
 import { ENV } from "../config/mod.ts";
 import { logger } from "../utils/logger.ts";
-import { setupCommands } from "./commands.ts";
-import { setupCallbackHandlers, setupMessageHandlers } from "./handlers.ts";
+import { setupCommands } from "./commands/index.ts";
+import {
+  setupCallbackHandlers,
+  setupMessageHandlers,
+} from "./handlers/index.ts";
 
 // Тип сессии
 interface SessionData {

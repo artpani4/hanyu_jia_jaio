@@ -19,6 +19,19 @@ export const ENV = {
   ADMIN_ID: config.env.ADMIN_ID,
 };
 
+// DeepSeek AI config
+export const AI_CONFIG = {
+  model: config.data.ai.model,
+  temperature: config.data.ai.temperature,
+  taskPrompt: config.data.ai.taskPrompt,
+};
+
+// Feature configuration
+export const FEATURES = config.data.features;
+
+// Word format configuration
+export const WORD_FORMAT = config.data.wordFormat;
+
 // Check required environment variables
 export function validateEnv() {
   const required = [
@@ -36,45 +49,3 @@ export function validateEnv() {
     );
   }
 }
-
-// DeepSeek AI config
-export const AI_CONFIG = {
-  model: "deepseek-chat",
-  temperature: 0.7,
-  taskPrompt: (words: string[], language: SupportedLanguage) => `
-你是一个中文学习助手。
-
-请用下列中文词语：${
-    words.join("，")
-  }，写出三到五个简单、自然、实用的中文句子，每句占一行，不要编号，也不要加标题。
-
-然后在新的一行写：---
-
-接着写出对应的${
-    language === "ru" ? "俄语" : language
-  }翻译，每句一行，顺序对应上面中文句子。不要编号，也不要加标题。
-
-示例：
-我喜欢学习中文。
-我们一起去吃饭吧。
----
-Мне нравится учить китайский.
-Пойдём поедим вместе.
-`,
-};
-
-// Feature configuration
-export const FEATURES = {
-  tasks: {
-    defaultWordCount: 10,
-    minWordCount: 5,
-    maxWordCount: 20,
-  },
-};
-
-export const WORD_FORMAT = {
-  separator: "|",
-  exampleFormat:
-    "иероглиф | пиньинь | перевод — или: иероглиф | перевод — или просто иероглиф",
-  example: "你好 | nǐ hǎo | привет",
-};

@@ -17,22 +17,6 @@ const app = new Hono();
 // Create webhook handler
 const handleUpdate = webhookCallback(bot, "hono");
 
-// // Telegram updates route with logging
-// app.use("/telegramGetUpdates", async (c, next) => {
-//   const body = await c.req.text();
-//   logger.info("📨 Received POST /telegramGetUpdates");
-//   logger.debug("Request body:\n" + body);
-
-//   // Set the body back so it can be read again by the handler
-//   //   c.req = new Request(c.req.url, {
-//   //     method: c.req.method,
-//   //     headers: c.req.headers,
-//   //     body,
-//   //   });
-
-//   await next();
-// });
-
 // Process telegram updates
 app.post("/telegramGetUpdates", handleUpdate);
 

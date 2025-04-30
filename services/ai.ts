@@ -20,7 +20,8 @@ export const aiService = {
       );
 
       const wordTexts = words.map((w) => w.word);
-      const prompt = AI_CONFIG.taskPrompt(wordTexts, language);
+      //@ts-ignore
+      const prompt = (AI_CONFIG.taskPrompt(wordTexts, language)) as string;
 
       const completion = await openai.chat.completions.create({
         model: AI_CONFIG.model,

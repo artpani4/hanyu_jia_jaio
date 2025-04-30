@@ -1,16 +1,15 @@
-// bot/commands.ts
+// bot/commands/basic.ts
 import { Bot } from "https://deno.land/x/grammy@v1.18.1/mod.ts";
-import { userDb } from "../services/db.ts";
-import { wordService } from "../services/words.ts";
-import { SupportedLanguage } from "../types.ts";
-import { detectLang, getString } from "../utils/strings.ts";
-import { logger } from "../utils/logger.ts";
-import { adminKeyboard, languageKeyboard, mainKeyboard } from "./keyboards.ts";
-import { ENV } from "../config/mod.ts";
-import type { MyContext } from "./mod.ts";
+import { userDb } from "../../services/db.ts";
+import { wordService } from "../../services/words.ts";
+import { SupportedLanguage } from "../../types.ts";
+import { detectLang, getString } from "../../utils/strings.ts";
+import { logger } from "../../utils/logger.ts";
+import { adminKeyboard, languageKeyboard, mainKeyboard } from "../keyboards.ts";
+import { ENV } from "../../config/mod.ts";
+import type { MyContext } from "../mod.ts";
 
-// Bot command handlers
-export function setupCommands(bot: Bot<MyContext>) {
+export function setupBasicCommands(bot: Bot<MyContext>) {
   // /start
   bot.command("start", async (ctx) => {
     const user = ctx.from!;
@@ -186,66 +185,4 @@ export function setupCommands(bot: Bot<MyContext>) {
       await ctx.reply("🚫 Something went wrong.");
     }
   });
-
-  // /admin
-  bot.command("admin", async (ctx) => {
-    try {
-      ctx.session.mode = "idle";
-
-      const userId = ctx.from!.id.toString();
-      if (userId !== ENV.ADMIN_ID) {
-        logger.warn(`Non-admin user ${userId} tried to access admin stats`);
-        await ctx.reply("⛔ You don't have permission to use this command.");
-        return;
-      }
-
-      const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
-      if (err) {
-        logger.error(`Error getting admin user: ${err.message}`);
-        await ctx.reply("🚫 An error occurred. Please try again later.");
-        return;
-      }
-
-      const lang = user?.language as SupportedLanguage ?? "en";
-      const stats = await wordService.getGlobalStats();
-
-      const statsMessage = getString(lang, "ADMIN_STATS_MESSAGE", {
-        users_count: stats.usersCount,
-        active_users: stats.activeUsers,
-        words_count: stats.wordsCount,
-        avg_words: stats.avgWordsPerUser,
-      });
-
-      await ctx.reply(statsMessage, {
-        reply_markup: adminKeyboard(lang),
-      });
-    } catch (e) {
-      logger.error(
-        `Error in /admin: ${e instanceof Error ? e.message : String(e)}`,
-      );
-      await ctx.reply("🚫 Something went wrong.");
-    }
-  });
-
-  // Setup commands for Telegram menu
-  const setupBotCommands = async () => {
-    try {
-      await bot.api.setMyCommands([
-        { command: "start", description: "Start the bot" },
-        { command: "language", description: "Change language" },
-        { command: "stats", description: "Show word statistics" },
-        { command: "reset", description: "Reset all words" },
-        { command: "help", description: "Show help information" },
-      ]);
-      logger.info("Bot commands set up successfully");
-    } catch (e) {
-      logger.error(
-        `Error setting up bot commands: ${
-          e instanceof Error ? e.message : String(e)
-        }`,
-      );
-    }
-  };
-
-  setupBotCommands();
 }

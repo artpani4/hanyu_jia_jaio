@@ -13,6 +13,7 @@ const baseCfg = Tuner.tune({
     WEBHOOK_URL: Tuner.Env.getString.orNothing(),
     PORT: Tuner.Env.getString.orDefault("8000"),
     ADMIN_ID: Tuner.Env.getString.orNothing(),
+    DEV: Tuner.Env.getBoolean.orDefault(true),
   },
   data: {
     logLevel: "info",

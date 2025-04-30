@@ -14,7 +14,7 @@ export const SUPPORTED_LANGUAGES = [
 
 export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
 
-// User data model
+// User data model (for Supabase)
 export interface User {
   id: string; // uuid
   telegram_id: number;
@@ -22,6 +22,15 @@ export interface User {
   language: SupportedLanguage;
   created_at?: string;
   updated_at?: string;
+}
+
+// User data model (for KV storage)
+export interface KVUser {
+  telegram_id: number;
+  username: string | null;
+  language: SupportedLanguage;
+  created_at: string;
+  updated_at: string;
 }
 
 // Word data model

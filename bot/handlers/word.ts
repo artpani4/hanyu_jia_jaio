@@ -62,14 +62,14 @@ export function setupWordCallbackHandlers(bot: Bot<MyContext>) {
     await ctx.answerCallbackQuery().catch(() => {});
     ctx.session.mode = "idle";
     queueMicrotask(async () => {
-      const userId = ctx.from!.id;
-      const [user, userErr] = await userDb.getUserByTelegramId(userId);
+      const userId = ctx.from!.id.toString();
+      const [user, userErr] = await userDb.getUserByTelegramId(ctx.from!.id);
       if (userErr || !user) {
         await ctx.reply("❌ User not found");
         return;
       }
       const lang = user.language as SupportedLanguage;
-      await wordService.resetWords(user.id);
+      await wordService.resetWords(userId);
       await ctx.editMessageText(getString(lang, "RESET_SUCCESS"), {
         reply_markup: mainKeyboard(lang),
       });

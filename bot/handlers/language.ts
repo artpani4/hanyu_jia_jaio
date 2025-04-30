@@ -12,14 +12,18 @@ export function setupLanguageCallbackHandlers(bot: Bot<MyContext>) {
     queueMicrotask(async () => {
       const selectedLang = ctx.match![1] as SupportedLanguage;
       const userId = ctx.from!.id;
+
+      // Update user language in KV and Supabase
       const [updatedUser, err] = await userDb.updateUserLanguage(
         userId,
         selectedLang,
       );
+
       if (err) {
         await ctx.reply("❌ Error changing language");
         return;
       }
+
       await ctx.editMessageText(getString(selectedLang, "LANG_SELECTED"));
       await ctx.reply(getString(selectedLang, "ADD_WORDS_INSTRUCTION"), {
         reply_markup: mainKeyboard(selectedLang),

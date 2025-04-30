@@ -15,17 +15,18 @@ export function setupTaskCallbackHandlers(bot: Bot<MyContext>) {
       show_alert: false,
     }).catch(() => {});
     ctx.session.mode = "idle";
+
     queueMicrotask(async () => {
       try {
-        const userId = ctx.from!.id;
-        const [user, userErr] = await userDb.getUserByTelegramId(userId);
+        const userId = ctx.from!.id.toString();
+        const [user, userErr] = await userDb.getUserByTelegramId(ctx.from!.id);
         if (userErr || !user) {
           await ctx.reply("❌ User not found");
           return;
         }
 
         const lang = user.language as SupportedLanguage;
-        const wordCount = await wordService.getUserWordCount(user.id);
+        const wordCount = await wordService.getUserWordCount(userId);
         if (wordCount === 0) {
           await ctx.reply(getString(lang, "NO_WORDS_ERROR"), {
             reply_markup: mainKeyboard(lang),
@@ -33,7 +34,7 @@ export function setupTaskCallbackHandlers(bot: Bot<MyContext>) {
           return;
         }
 
-        const words = await wordService.getLeastUsedWords(user.id, 10);
+        const words = await wordService.getLeastUsedWords(userId, 10);
         const result = await aiService.generateSentences(words, lang);
 
         if (!result.success || (result.sentences ?? []).length === 0) {
@@ -44,7 +45,7 @@ export function setupTaskCallbackHandlers(bot: Bot<MyContext>) {
           result.sentences!.some((sentence) => sentence.includes(w.hanzi))
         );
         const usedWordIds = usedWords.map((w) => w.id);
-        await wordService.updateWordsUsage(user.id, usedWordIds);
+        await wordService.updateWordsUsage(userId, usedWordIds);
 
         const translated: string[] = [];
         const chinese: string[] = [];
@@ -68,17 +69,22 @@ export function setupTaskCallbackHandlers(bot: Bot<MyContext>) {
           }</tg-spoiler>`,
           "",
           "📊 Updated word frequencies:",
-          words.map((w) => `${w.hanzi}: used ${w.times_used + 1} time(s)`).join(
-            "\n",
-          ),
+          usedWords.map((w) => `${w.hanzi}: used ${w.times_used + 1} time(s)`)
+            .join(
+              "\n",
+            ),
         ].join("\n");
 
         await ctx.reply(taskMessage, {
           reply_markup: mainKeyboard(lang),
           parse_mode: "HTML",
         });
-      } catch {
-        await ctx.reply("❌ Error getting task");
+      } catch (error) {
+        await ctx.reply(
+          `❌ Error getting task: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+        );
       }
     });
   });

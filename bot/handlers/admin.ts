@@ -18,21 +18,26 @@ export function setupAdminCallbackHandlers(bot: Bot<MyContext>) {
         await ctx.reply("⛔ You don't have permission to use this command.");
         return;
       }
+
       const [user, userErr] = await userDb.getUserByTelegramId(
         parseInt(userId),
       );
+
       if (userErr || !user) {
         await ctx.reply("❌ User not found");
         return;
       }
+
       const lang = user.language as SupportedLanguage;
       const stats = await wordService.getGlobalStats();
+
       const statsMessage = getString(lang, "ADMIN_STATS_MESSAGE", {
         users_count: stats.usersCount,
         active_users: stats.activeUsers,
         words_count: stats.wordsCount,
         avg_words: stats.avgWordsPerUser,
       });
+
       await ctx.reply(statsMessage, {
         reply_markup: adminKeyboard(lang),
       });

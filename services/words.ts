@@ -1,9 +1,8 @@
 // services/words.ts
+
+import { kv } from "../shared.ts";
 import { KVWord, WordData } from "../types.ts";
 import { logger } from "../utils/logger.ts";
-
-// Initialize Deno KV
-const kv = await Deno.openKv();
 
 // Word storage and operations
 export const wordService = {

@@ -22,6 +22,7 @@ export function setupAdminCommands(bot: Bot<MyContext>) {
         return;
       }
 
+      // Get user from KV storage
       const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
       if (err) {
         logger.error(`Error getting admin user: ${err.message}`);

@@ -16,6 +16,7 @@ export function setupBasicCommands(bot: Bot<MyContext>) {
     logger.info(`/start from ${user.id} (${user.username ?? "no_username"})`);
 
     try {
+      // This will create/update the user in both Supabase and KV
       const [dbUser, err] = await userDb.upsertUser(user.id, {
         username: user.username,
         language: detectLang(user.language_code),
@@ -54,6 +55,7 @@ export function setupBasicCommands(bot: Bot<MyContext>) {
     try {
       ctx.session.mode = "idle";
 
+      // Get user from KV
       const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
       if (err) {
         logger.error(`Error getting user for language: ${err.message}`);
@@ -79,6 +81,7 @@ export function setupBasicCommands(bot: Bot<MyContext>) {
     try {
       ctx.session.mode = "idle";
 
+      // Get user from KV
       const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
       if (err) {
         logger.error(`Error getting user for help: ${err.message}`);
@@ -101,7 +104,9 @@ export function setupBasicCommands(bot: Bot<MyContext>) {
   bot.command("stats", async (ctx) => {
     try {
       ctx.session.mode = "idle";
+      const userId = ctx.from!.id.toString();
 
+      // Get user from KV
       const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
       if (err) {
         logger.error(`Error getting user for stats: ${err.message}`);
@@ -110,18 +115,18 @@ export function setupBasicCommands(bot: Bot<MyContext>) {
       }
 
       const lang = user?.language as SupportedLanguage ?? "en";
-      const wordCount = await wordService.getUserWordCount(user.id);
+      const wordCount = await wordService.getUserWordCount(userId);
 
       if (wordCount === 0) {
         await ctx.reply(getString(lang, "STATS_NO_WORDS"), {
-          reply_markup: user.id.toString() === ENV.ADMIN_ID
+          reply_markup: user.telegram_id.toString() === ENV.ADMIN_ID
             ? adminKeyboard(lang)
             : mainKeyboard(lang),
         });
         return;
       }
 
-      const stats = await wordService.getWordStats(user.id);
+      const stats = await wordService.getWordStats(userId);
 
       const topWordsText = stats.topWords.length > 0
         ? stats.topWords.map((w, i) => `${i + 1}. ${w.word} (${w.timesUsed})`)
@@ -136,7 +141,7 @@ export function setupBasicCommands(bot: Bot<MyContext>) {
       });
 
       await ctx.reply(statsMessage, {
-        reply_markup: user.id.toString() === ENV.ADMIN_ID
+        reply_markup: user.telegram_id.toString() === ENV.ADMIN_ID
           ? adminKeyboard(lang)
           : mainKeyboard(lang),
       });
@@ -153,6 +158,7 @@ export function setupBasicCommands(bot: Bot<MyContext>) {
     try {
       ctx.session.mode = "idle";
 
+      // Get user from KV
       const [user, err] = await userDb.getUserByTelegramId(ctx.from!.id);
       if (err) {
         logger.error(`Error getting user for reset: ${err.message}`);

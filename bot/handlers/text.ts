@@ -59,8 +59,8 @@ export function setupTextMessageHandlers(bot: Bot<MyContext>) {
       return;
     }
 
-    const userId = ctx.from.id;
-    const [user, userErr] = await userDb.getUserByTelegramId(userId);
+    const userId = ctx.from.id.toString();
+    const [user, userErr] = await userDb.getUserByTelegramId(ctx.from.id);
     if (userErr || !user) {
       await ctx.reply("❌ Error. Try using /start");
       return;
@@ -78,7 +78,7 @@ export function setupTextMessageHandlers(bot: Bot<MyContext>) {
       return;
     }
 
-    const addedCount = await wordService.addWords(user.id, words);
+    const addedCount = await wordService.addWords(userId, words);
     ctx.session.mode = "idle";
 
     let replyText = `${

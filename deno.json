@@ -2,7 +2,11 @@
   "tasks": {
     "dev": "deno run -A --unstable-kv main.ts",
     "webhook": "deno run -A service/helpers/setWebhook.ts",
-    "start": "dxd vault run \"deno task dev\""
+    "start": "dxd vault run \"deno task dev\"",
+    "kv-show": "deno run -A --unstable-kv services/kv-web-viewer.ts",
+    "kv": "dxd vault run \"deno task kv-show\"",
+    "kv-debug": "deno run -A --unstable-kv services/kv-debug.ts",
+    "kvd": "dxd vault run \"deno task kv-debug\""
   },
   "imports": {
     "$bot": "./service/bot/mod.ts",
